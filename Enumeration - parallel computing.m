@@ -1,15 +1,19 @@
 r = creat_ur5('right',transl(0,-0.544,0)); %持笔机器人
+figure_result = figure('name','RESULT');
+view(137,30)
 
 %% 并行运算设置
 if isempty(gcp('nocreate')) %如果之前没有开启parpool则启动
     parpool(maxNumCompThreads);  %设为最大可使用核数
 end
+q = parallel.pool.DataQueue ;
+afterEach(q,@my_scatter);
 %% 其他设置
-board_length = 3; %板长
-board_width = 3; %板宽
+board_length = 2; %板长
+board_width = 2 ; %板宽
 pen_length = 0.05; %笔长
-left_end = transl(0,0,1.5) * trotx(-0.5*pi);
-delta_dis = 0.03; %每个点之间的间距
+left_end = transl(0,0,0.4) * trotx(-0.5*pi);
+delta_dis = 0.02; %每个点之间的间距
 % 版上四角的位姿
 board_left_top = left_end*transl(board_length/2,board_width/2,0);
 board_left_bottom = left_end*transl(board_length/2,-board_width/2,0);
@@ -17,33 +21,29 @@ board_right_top = left_end*transl(-board_length/2,board_width/2,0);
 board_right_bottom = left_end*transl(-board_length/2,-board_width/2,0);
 
 %% 绘制纸张的边缘
-% hold on;
-% trplot(left_end);
-% edge_x = [ board_left_top(1,4) board_left_bottom(1,4) board_right_bottom(1,4) board_right_top(1,4) board_left_top(1,4)];
-% edge_y = [ board_left_top(2,4) board_left_bottom(2,4) board_right_bottom(2,4) board_right_top(2,4) board_left_top(2,4)];
-% edge_z = [ board_left_top(3,4) board_left_bottom(3,4) board_right_bottom(3,4) board_right_top(3,4) board_left_top(3,4)];
-% plot3(edge_x,edge_y,edge_z);
+hold on;
+trplot(left_end);
+edge_x = [ board_left_top(1,4) board_left_bottom(1,4) board_right_bottom(1,4) board_right_top(1,4) board_left_top(1,4)];
+edge_y = [ board_left_top(2,4) board_left_bottom(2,4) board_right_bottom(2,4) board_right_top(2,4) board_left_top(2,4)];
+edge_z = [ board_left_top(3,4) board_left_bottom(3,4) board_right_bottom(3,4) board_right_top(3,4) board_left_top(3,4)];
+plot3(edge_x,edge_y,edge_z);
 %hold off;
 %% 测试
 %测试思路：一次测试一行，小循环修改z值，大循环修改x值
-color_singularity = [251 98 112]; %写字的路径颜色
-color_safe = [36 201 179]; %抬笔的路径颜色
+color_singularity = [251/255 98/255 112/255]; %写字的路径颜色
+color_safe = [36/255 201/255 179/255]; %抬笔的路径颜色
 a3 = -392.25;
 a2 = -425;
 d5 = 94.56;
 diff_upper_limit = 0.5;
-pixel_length = round(board_length/delta_dis);
-pixel_width = round(board_width/delta_dis);
-%% 创建一个空白图片
-img_blank = uint8(255*ones(pixel_width,pixel_length,3));
+
 tic
-parfor m = 1:round(pen_length/delta_dis)
-    img_name = ['.\output\' num2str(m) '.png'];
-    img_result = img_blank;
-    for n = 1:pixel_width 
-        T1 = transl(0,-delta_dis*m,-delta_dis*n)*board_left_top;
-        T2 = transl(0,-delta_dis*m,-delta_dis*n)*board_right_top;
-        trajectory =ctraj(T1,T2,pixel_length);
+for m = 0:pen_length/delta_dis
+    %color = [rand rand rand];
+    parfor n = 0:board_width/delta_dis 
+        T1 = transl(0,-delta_dis*m,-delta_dis*n)*board_left_bottom;
+        T2 = transl(0,-delta_dis*m,-delta_dis*n)*board_right_bottom;
+        trajectory =ctraj(T1,T2,board_length/delta_dis);%board_length/delta_dis太大了
         a = ur5_ikine(r,trajectory);
         for i=1:size(a,1)
             c2 = cos(a(i,2));
@@ -70,17 +70,11 @@ parfor m = 1:round(pen_length/delta_dis)
                 color = color_singularity;
             end
             pos = r.fkine(a(i,:));
-            diff = round(abs(([board_left_top(3,4) board_left_top(1,4)] - [pos(3,4) pos(1,4)])/delta_dis));
-            
-            img_result(diff(1),diff(2),:) = color;
+            dot_inf = [pos(1,4) pos(2,4) pos(3,4) color];
+            send(q,dot_inf);
+            %scatter3(dot_pos(1),dot_pos(2),dot_pos(3),36,color);
         end
     end
-    
-    if n<10
-        img_result(T1(3,4),T1(1,4),:) = color_safe;
-        img_result(T2(3,4),T2(1,4),:) = color_singularity;
-    end
-    imwrite(img_result,img_name);
 end
 toc
 
