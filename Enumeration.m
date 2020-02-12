@@ -8,13 +8,13 @@ end
 board_length = 3; %板长
 board_width = 3; %板宽
 pen_length = 0.05; %笔长
-left_end = transl(0,0,1.5) * trotx(-0.5*pi);
+left_end = transl(0,0,0) * trotx(-0.5*pi);
 delta_dis = 0.03; %每个点之间的间距
 % 版上四角的位姿
-board_left_top = left_end*transl(board_length/2,board_width/2,0);
-board_left_bottom = left_end*transl(board_length/2,-board_width/2,0);
-board_right_top = left_end*transl(-board_length/2,board_width/2,0);
-board_right_bottom = left_end*transl(-board_length/2,-board_width/2,0);
+board_left_top = transl(board_length/2,0,board_width/2)*left_end;
+board_left_bottom = transl(board_length/2,0,-board_width/2)*left_end;
+board_right_top = transl(-board_length/2,0,board_width/2)*left_end;
+board_right_bottom = transl(-board_length/2,0,-board_width/2)*left_end;
 
 %% 绘制纸张的边缘
 % hold on;
@@ -75,11 +75,7 @@ parfor m = 1:round(pen_length/delta_dis)
             img_result(diff(1),diff(2),:) = color;
         end
     end
-    
-    if n<10
-        img_result(T1(3,4),T1(1,4),:) = color_safe;
-        img_result(T2(3,4),T2(1,4),:) = color_singularity;
-    end
+
     imwrite(img_result,img_name);
 end
 toc
